@@ -1,0 +1,86 @@
+# Byte-compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+ENV/
+*.env
+*.venv
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# macOS resource forks
+Icon?
+._*
+
+# Logs
+*.log
+
+# Environment variables
+*.env
+.env.*
+
+# Cache and temporary files
+*.swp
+*.swo
+*.tmp
+.cache/
+*.pid
+
+# Pytest cache
+.pytest_cache/
+
+# Coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# MyPy
+.mypy_cache/
+
+# Pylint
+.pylint.d/
+
+# Pyre type checker
+.pyre/
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+wheels/
+
+# Sphinx documentation
+docs/_build/
+
+# IDEs and editors
+.idea/
+.vscode/
+*.iml
+*.sublime-project
+*.sublime-workspace
+
+# Other
+*.bak
+*.orig
+*.rej
+*.sublime-*
