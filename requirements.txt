@@ -1,8 +1,7 @@
-    .venv/bin/pip3 install pandas openpyxl
-     .venv/bin/pip3 install transformers
-.venv/bin/pip3 install sentence-transformers
-.venv/bin/pip3 install transformers torch
-.venv/bin/pip3 install einops
-.venv/bin/pip3 install datasets
-
-.venv/bin/python3 main.py
+pandas
+openpyxl
+transformers
+sentence-transformers
+torch
+einops
+datasets
