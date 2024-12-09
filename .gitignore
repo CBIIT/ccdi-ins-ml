@@ -79,6 +79,12 @@ docs/_build/
 *.sublime-project
 *.sublime-workspace
 
+# Data files
+data/input_data/*
+!data/input_data/sample.xlsx
+data/output_data/*
+!data/output_data/sample.xlsx
+
 # Other
 *.bak
 *.orig
