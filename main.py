@@ -15,10 +15,10 @@ dir = "2.0.0.4_test"
 logging.info(f"Loading data from directory: {dir}")
 
 # Load datasets and program data from the provided CSV files
-datasets_df = pd.read_csv(f'./data/input_data/{dir}/dbgap_datasets.csv')
-programs_df = pd.read_csv(f'./data/input_data/{dir}/program.csv')
-project_df = pd.read_csv(f'./data/input_data/{dir}/project.csv')
-grant_df = pd.read_csv(f'./data/input_data/{dir}/grant.csv')
+datasets_df = pd.read_csv(f'./data/input_data/{dir}/dbgap_datasets.tsv', sep='\t')
+programs_df = pd.read_csv(f'./data/input_data/{dir}/program.tsv', sep='\t')
+project_df = pd.read_csv(f'./data/input_data/{dir}/project.tsv', sep='\t')
+grant_df = pd.read_csv(f'./data/input_data/{dir}/grant.tsv', sep='\t')
 
 # Prepare lists to store results
 program_results, project_results, grant_results = [], [], []
