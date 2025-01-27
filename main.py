@@ -2,8 +2,10 @@ import pandas as pd
 import datetime
 import logging
 from sentence_transformers import SentenceTransformer, util
+from checks.dataset_program_checks import get_dataset_program_name_matches
 
 # Setup logging
+logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -12,7 +14,7 @@ logging.basicConfig(
 
 # Directory setup
 dir = "2.0.0.4_test"
-logging.info(f"Loading data from directory: {dir}")
+logger.info(f"Loading data from directory: {dir}")
 
 # Load datasets and program data from the provided CSV files
 datasets_df = pd.read_csv(f'./data/input_data/{dir}/dbgap_datasets.tsv', sep='\t')
@@ -20,11 +22,14 @@ programs_df = pd.read_csv(f'./data/input_data/{dir}/program.tsv', sep='\t')
 project_df = pd.read_csv(f'./data/input_data/{dir}/project.tsv', sep='\t')
 grant_df = pd.read_csv(f'./data/input_data/{dir}/grant.tsv', sep='\t')
 
+# Handle empty cells
+datasets_df['PI_name'] = datasets_df['PI_name'].fillna('')
+
 # Prepare lists to store results
 program_results, project_results, grant_results = [], [], []
 
 # Load a pre-trained sentence transformer model
-logging.info("Loading sentence transformer model")
+logger.info("Loading sentence transformer model")
 model = SentenceTransformer(
     "dunzhang/stella_en_400M_v5",
     trust_remote_code=True,
@@ -36,14 +41,16 @@ model.tokenizer.padding_side = "right"
 
 doSemantic = False
 
-
 # Process each dataset row
 for _, dataset_row in datasets_df.iterrows():
+    logger.info(f"Reading row {datasets_df.index}")
+    logger.info(f"Reading PI {dataset_row.get('PI_name', '')}")
+
     # Get and format dataset data
     dataset_title = dataset_row.get('dataset_title')
     dataset_description = dataset_row.get('description', '').lower()
     dataset_funding_source = dataset_row.get('funding_source')
-    dataset_pi = dataset_row.get('PI_name', '').strip().lower()
+    dataset_pi = dataset_row.get('PI_name', '').strip().lower().split(';')
 
     dataset_funding_source_list = [
         fs.strip().lower() for fs in str(dataset_funding_source).split(';') if fs.strip()
@@ -65,45 +72,35 @@ for _, dataset_row in datasets_df.iterrows():
             pi.strip().lower() for pi in str(program_row.get('contact_pi', '')).split(';') if pi.strip()
         ]
 
-        
         # RULE 1: Funding Source Matching
-        logging.info(f"RULE 1: Funding Source Matching")
+        logger.info(f"RULE 1: Funding Source Matching")
         funding_related = (
             any(nofo in dataset_description or any(nofo in fs for fs in dataset_funding_source_list) for nofo in program_nofo_list) or
             any(award in dataset_description or any(award in fs for fs in dataset_funding_source_list) for award in program_awards_list)
         )
         if funding_related:
-            logging.info(f"*******************************************************************************************************")
-            logging.info(f"Funding source match found between dataset and  program")
-            logging.info(f"dataset_description:            '{dataset_description}'")
-            logging.info(f"dataset_funding_source_list:    '{dataset_funding_source_list}'")
-            logging.info(f"dataset_funding_source_list:    '{dataset_funding_source_list}'")
-            logging.info(f"nofo:                           '{program_nofo_list}'")
-            logging.info(f"award:                          '{program_awards_list}'")
-
+            logger.info(f"*******************************************************************************************************")
+            logger.info(f"Funding source match found between dataset and  program")
+            logger.info(f"dataset_description:            '{dataset_description}'")
+            logger.info(f"dataset_funding_source_list:    '{dataset_funding_source_list}'")
+            logger.info(f"dataset_funding_source_list:    '{dataset_funding_source_list}'")
+            logger.info(f"nofo:                           '{program_nofo_list}'")
+            logger.info(f"award:                          '{program_awards_list}'")
 
         # RULE 2: Name or Acronym Matching
-        logging.info(f"RULE 2: Name or Acronym Matching")
-        name_related = any(keyword in dataset_description or keyword in dataset_title.lower() for keyword in [program_name, program_acronym])
-        if name_related:
-            logging.info(f"*******************************************************************************************************")
-            logging.info(f"Name/acronym match found between  dataset and  program")
-            logging.info(f"dataset_description:            '{dataset_description}'")
-            logging.info(f"dataset_title:                  '{dataset_title}'")
-            logging.info(f"program_name:                   '{program_name}'")
-            logging.info(f"program_acronym:                '{program_acronym}'")
+        logger.info(f"RULE 2: Name or Acronym Matching")
+        dataset_program_name_matches = get_dataset_program_name_matches(dataset_description, dataset_title, program_acronym, program_name)
 
         # RULE 3: PI Matching
-        logging.info(f"RULE 3: PI Matching")
+        logger.info(f"RULE 3: PI Matching")
         pi_related = False
         if not (len(dataset_pi) == 0 or len(program_pi_list) == 0):
             pi_related = any(pi in dataset_pi for pi in program_pi_list)
         if pi_related:
-            logging.info(f"***************************************************************************************************************")
-            logging.info(f"PI match found between dataset  and  program")
-            logging.info(f"dataset_pi:                      '{dataset_pi}'")
-            logging.info(f"program_pi_list:                 '{program_pi_list}'")
-
+            logger.info(f"***************************************************************************************************************")
+            logger.info(f"PI match found between dataset  and  program")
+            logger.info(f"dataset_pi:                      '{dataset_pi}'")
+            logger.info(f"program_pi_list:                 '{program_pi_list}'")
 
         # Append results
         program_results.append({
@@ -111,7 +108,8 @@ for _, dataset_row in datasets_df.iterrows():
             'program': program_name,
             'program_id': program_id,
             'Funding Source Matching': 'yes' if funding_related else 'no',
-            'Acronym/Name Matching': 'yes' if name_related else 'no',
+            'Acronym/Name Matching': 'yes' if dataset_program_name_matches else 'no',
+            'Acronym/Name Values': dataset_program_name_matches if dataset_program_name_matches else None,
             'PI Matching': 'yes' if pi_related else 'no',
         })
 
@@ -125,17 +123,17 @@ for _, dataset_row in datasets_df.iterrows():
         program_id = project_row.get('program.program_id')
 
         # RULE 4: Org Matching
-        logging.info(f"RULE 4: Org Matching")
+        logger.info(f"RULE 4: Org Matching")
         org_related = project_org_name.strip().lower() in dataset_description.strip().lower() if pd.notna(project_org_name) else False
         if org_related:
-            logging.info(f"*******************************************************************************************************")
-            logging.info(f"Organization match found between dataset  and  project")
-            logging.info(f"dataset_title:                 '{dataset_title}'")
-            logging.info(f"project_title:                 '{project_title}'")
+            logger.info(f"*******************************************************************************************************")
+            logger.info(f"Organization match found between dataset  and  project")
+            logger.info(f"dataset_title:                 '{dataset_title}'")
+            logger.info(f"project_title:                 '{project_title}'")
 
 
         # RULE 5: Description Semantic Matching
-        logging.info(f"Description Semantic Matching ----- skip :{ not doSemantic }")
+        logger.info(f"Description Semantic Matching ----- skip :{ not doSemantic }")
         desc_related = False
         if pd.notna(project_abstract_text) and doSemantic:
             embedding1 = model.encode(project_abstract_text + project_title)
@@ -143,10 +141,10 @@ for _, dataset_row in datasets_df.iterrows():
             similarity = util.cos_sim(embedding1, embedding2).item()
             desc_related = similarity > 0.6
             if desc_related:
-                logging.info(f"*******************************************************************************************************")
-                logging.info(f"Description semantic match found  between dataset  and  project with similarity score {similarity:.2f}")
-                logging.info(f"dataset_description:             '{dataset_description}'")
-                logging.info(f"project_abstract_text:           '{project_abstract_text}'")
+                logger.info(f"*******************************************************************************************************")
+                logger.info(f"Description semantic match found  between dataset  and  project with similarity score {similarity:.2f}")
+                logger.info(f"dataset_description:             '{dataset_description}'")
+                logger.info(f"project_abstract_text:           '{project_abstract_text}'")
         # Append results
         project_results.append({
             'datasets': dataset_title,
@@ -169,39 +167,39 @@ for _, dataset_row in datasets_df.iterrows():
         grant_org_name= grant_org_name.strip().lower() if pd.notna(grant_org_name) else ''
         
         # RULE 6: PI Matching
-        logging.info(f"RULE 6: PI Matching")
+        logger.info(f"RULE 6: PI Matching")
         grant_pi_related = False
         if not (dataset_pi != "" or len(principal_investigators_list) == 0):
             grant_pi_related = any(pi in dataset_pi for pi in principal_investigators_list)
         if grant_pi_related:
-            logging.info(f"*******************************************************************************************************")
-            logging.info(f"PI match found between dataset and grant")
-            logging.info(f"dataset_pi:                      '{dataset_pi}'")
-            logging.info(f"principal_investigators_list:    '{principal_investigators_list}'")
+            logger.info(f"*******************************************************************************************************")
+            logger.info(f"PI match found between dataset and grant")
+            logger.info(f"dataset_pi:                      '{dataset_pi}'")
+            logger.info(f"principal_investigators_list:    '{principal_investigators_list}'")
 
         # RULE 7: Funding Matching
-        logging.info(f"RULE 7: Funding Matching")
+        logger.info(f"RULE 7: Funding Matching")
         grant_funding_related = False
         if grant_opportunity_number != "":
             grant_funding_related = (
                 grant_opportunity_number in dataset_funding_source
             ) if pd.notna(grant_opportunity_number) and pd.notna(dataset_funding_source) else False
         if grant_funding_related:
-            logging.info(f"*******************************************************************************************************")
-            logging.info(f"Funding source match found between dataset and grant")
-            logging.info(f"dataset_funding_source:          '{dataset_funding_source}'")
-            logging.info(f"grant_opportunity_number:        '{grant_opportunity_number}'")
+            logger.info(f"*******************************************************************************************************")
+            logger.info(f"Funding source match found between dataset and grant")
+            logger.info(f"dataset_funding_source:          '{dataset_funding_source}'")
+            logger.info(f"grant_opportunity_number:        '{grant_opportunity_number}'")
 
         # RULE 8: Org Matching
-        logging.info(f"RULE 8: Org Matching")
+        logger.info(f"RULE 8: Org Matching")
         grant_org_related = False
         if grant_org_name != "":
             grant_org_related = grant_org_name in dataset_description
         if grant_org_related:
-            logging.info(f"*******************************************************************************************************")
-            logging.info(f"Organization match found between dataset and grant")
-            logging.info(f"grant_org_name:                  '{grant_org_name}'")
-            logging.info(f"dataset_description:             '{dataset_description}'")
+            logger.info(f"*******************************************************************************************************")
+            logger.info(f"Organization match found between dataset and grant")
+            logger.info(f"grant_org_name:                  '{grant_org_name}'")
+            logger.info(f"dataset_description:             '{dataset_description}'")
 
         # Append results
         grant_results.append({
@@ -222,4 +220,4 @@ for result_type, results in zip(
     output_df = pd.DataFrame(results)
     file_name = f"./data/output_data/{result_type}_{now.strftime('%Y%m%d_%H%M%S')}.xlsx"
     output_df.to_excel(file_name, index=False)
-    logging.info(f"Output saved to '{file_name}'")
+    logger.info(f"Output saved to '{file_name}'")
