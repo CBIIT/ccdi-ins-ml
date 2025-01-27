@@ -2,7 +2,7 @@ import pandas as pd
 import datetime
 import logging
 from sentence_transformers import SentenceTransformer, util
-from checks.dataset_program_checks import get_dataset_program_name_matches
+from checks.dataset_program_checks import get_dataset_program_name_matches, get_dataset_program_funding_matches
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -74,18 +74,7 @@ for _, dataset_row in datasets_df.iterrows():
 
         # RULE 1: Funding Source Matching
         logger.info(f"RULE 1: Funding Source Matching")
-        funding_related = (
-            any(nofo in dataset_description or any(nofo in fs for fs in dataset_funding_source_list) for nofo in program_nofo_list) or
-            any(award in dataset_description or any(award in fs for fs in dataset_funding_source_list) for award in program_awards_list)
-        )
-        if funding_related:
-            logger.info(f"*******************************************************************************************************")
-            logger.info(f"Funding source match found between dataset and  program")
-            logger.info(f"dataset_description:            '{dataset_description}'")
-            logger.info(f"dataset_funding_source_list:    '{dataset_funding_source_list}'")
-            logger.info(f"dataset_funding_source_list:    '{dataset_funding_source_list}'")
-            logger.info(f"nofo:                           '{program_nofo_list}'")
-            logger.info(f"award:                          '{program_awards_list}'")
+        dataset_program_funding_matches = get_dataset_program_funding_matches(dataset_description, dataset_funding_source_list, program_awards_list, program_nofo_list)
 
         # RULE 2: Name or Acronym Matching
         logger.info(f"RULE 2: Name or Acronym Matching")
@@ -107,9 +96,10 @@ for _, dataset_row in datasets_df.iterrows():
             'datasets': dataset_title,
             'program': program_name,
             'program_id': program_id,
-            'Funding Source Matching': 'yes' if funding_related else 'no',
+            'Funding Source Matching': 'yes' if dataset_program_funding_matches else 'no',
+            'Funding Source Values': dataset_program_funding_matches or None,
             'Acronym/Name Matching': 'yes' if dataset_program_name_matches else 'no',
-            'Acronym/Name Values': dataset_program_name_matches if dataset_program_name_matches else None,
+            'Acronym/Name Values': dataset_program_name_matches or None,
             'PI Matching': 'yes' if pi_related else 'no',
         })
 
