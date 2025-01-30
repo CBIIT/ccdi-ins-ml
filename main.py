@@ -1,8 +1,15 @@
 import pandas as pd
 import datetime
 import logging
-from sentence_transformers import SentenceTransformer, util
-from checks.dataset_program_checks import get_dataset_program_name_matches, get_dataset_program_funding_matches
+from sentence_transformers import (
+    SentenceTransformer,
+    util
+)
+from checks.dataset_program_checks import (
+    get_dataset_program_name_matches,
+    get_dataset_program_funding_matches,
+    get_dataset_program_pi_matches
+)
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -82,14 +89,7 @@ for _, dataset_row in datasets_df.iterrows():
 
         # RULE 3: PI Matching
         logger.info(f"RULE 3: PI Matching")
-        pi_related = False
-        if not (len(dataset_pi) == 0 or len(program_pi_list) == 0):
-            pi_related = any(pi in dataset_pi for pi in program_pi_list)
-        if pi_related:
-            logger.info(f"***************************************************************************************************************")
-            logger.info(f"PI match found between dataset  and  program")
-            logger.info(f"dataset_pi:                      '{dataset_pi}'")
-            logger.info(f"program_pi_list:                 '{program_pi_list}'")
+        dataset_program_pi_matches = get_dataset_program_pi_matches(dataset_pi, program_pi_list)
 
         # Append results
         program_results.append({
@@ -100,7 +100,8 @@ for _, dataset_row in datasets_df.iterrows():
             'Funding Source Values': dataset_program_funding_matches or None,
             'Acronym/Name Matching': 'yes' if dataset_program_name_matches else 'no',
             'Acronym/Name Values': dataset_program_name_matches or None,
-            'PI Matching': 'yes' if pi_related else 'no',
+            'PI Matching': 'yes' if dataset_program_pi_matches else 'no',
+            'PI Names': ';'.join(dataset_program_pi_matches) if dataset_program_pi_matches else None
         })
 
     # Project Matching

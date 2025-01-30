@@ -111,3 +111,21 @@ def get_dataset_program_name_matches(dataset_description, dataset_title, program
         logger.info(f"program_acronym:                '{program_acronym}'")
 
     return matches
+
+def get_dataset_program_pi_matches(dataset_pi, program_pi_list):
+    """Checks whether the dataset and program have matching PIs
+
+    Args:
+        dataset_pi (str): The dataset's list of PIs
+        program_pi_list (list): The program's list of PIs
+    """
+
+    matches = [pi for pi in dataset_pi if pi in program_pi_list]
+
+    if matches:
+        logger.info(f"***************************************************************************************************************")
+        logger.info(f"PI match found between dataset  and  program")
+        logger.info(f"dataset_pi:                      '{dataset_pi}'")
+        logger.info(f"program_pi_list:                 '{program_pi_list}'")
+
+    return matches
