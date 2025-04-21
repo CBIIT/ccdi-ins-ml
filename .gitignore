@@ -86,6 +86,7 @@ data/output_data/*
 !data/output_data/sample.xlsx
 
 # Other
+.python-version
 *.bak
 *.orig
 *.rej

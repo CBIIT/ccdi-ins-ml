@@ -1,7 +1,9 @@
+beautifulsoup4
 datasets
 einops
 openpyxl
 pandas
+rapidfuzz
 sentence-transformers
 torch
 transformers
