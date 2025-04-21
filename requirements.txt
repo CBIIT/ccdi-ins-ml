@@ -1,8 +1,10 @@
 beautifulsoup4
 datasets
 einops
+nameparser
 openpyxl
 pandas
+pyyaml
 rapidfuzz
 sentence-transformers
 torch

@@ -1,7 +1,10 @@
+import argparse
 import pandas as pd
 import datetime
 import logging
+import yaml
 from bs4 import BeautifulSoup
+from pathlib import Path
 from sentence_transformers import (
     SentenceTransformer,
     util
@@ -15,6 +18,32 @@ from util.formatting import (
     clean_award_number
 )
 
+def get_columns(all_columns, rules, column_types):
+    """
+    Get the columns to write
+
+    Args:
+        all_columns (dict): All available columns
+        rules (list): Rules to apply
+        column_types (list): Types of columns to write
+
+    Returns:
+        list: Columns to write
+    """
+
+    columns = []
+
+    for column_type in column_types:
+        columns.extend(all_columns['all'][column_type])
+
+    for rule in rules:
+        rule_key = f'rule{rule}'
+
+        for column_type in column_types:
+            columns.extend(all_columns[rule_key][column_type])
+
+    return columns
+
 # Setup logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -22,6 +51,14 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[logging.FileHandler('data_processing.log'), logging.StreamHandler()]
 )
+
+# Parse command line arguments
+parser = argparse.ArgumentParser()
+parser.add_argument('--rules', nargs='+', type=str, required=True)
+parser.add_argument('--columns', nargs='+', type=str, required=True)
+args = parser.parse_args()
+logger.info(f"Rules to run: {', '.join(args.rules)}")
+logger.info(f"Columns to write: {', '.join(args.columns)}")
 
 # Directory setup
 dir = '2.0.0.4_test'
@@ -42,6 +79,10 @@ programs_df['nofo'] = programs_df['nofo'].fillna('')
 
 # Prepare lists to store results
 program_results, project_results, grant_results = [], [], []
+
+# Prepare column headers to write
+with open(Path('config') / 'columns.yaml', 'r') as file:
+    column_headers = yaml.safe_load(file)
 
 # Load a pre-trained sentence transformer model
 # logger.info("Loading sentence transformer model")
@@ -119,10 +160,9 @@ for _, dataset_row in datasets_df.iterrows():
         logger.info(f'RULE 3: PI Matching')
         dataset_program_pi_matches = get_dataset_program_pi_matches(dataset_pi, program_pi_list)
 
-        # Append results
-        program_results.append({
-            'dataset': dataset_title,
-            'program': program_name,
+        program_result = {
+            'dataset_title': dataset_title,
+            'program_name': program_name,
             'program_id': program_id,
             'dataset_funding_sources': dataset_funding_source_list or None,
             'dataset_funding_sources_cleaned': dataset_funding_source_list_cleaned or None,
@@ -130,13 +170,13 @@ for _, dataset_row in datasets_df.iterrows():
             'program_awards_cleaned': program_awards_list_cleaned or None,
             'program_nofo': program_nofo_list or None,
             'program_nofo_cleaned': program_nofo_list_cleaned or None,
-            'Funding Source Matching': 'yes' if dataset_program_funding_matches else 'no',
-            'Funding Source Values': dataset_program_funding_matches or None,
+            'Funding Source Matches?': 'yes' if dataset_program_funding_matches else 'no',
+            'Funding Source Matching Values': dataset_program_funding_matches or None,
             'Best funding_source match to award (difflib)': dataset_program_fs_difflib_matches['award']['funding_source']['dataset_str'],
             'Best award match to funding_source (difflib)': dataset_program_fs_difflib_matches['award']['funding_source']['program_str'],
             'Highest award-to-funding_source similarity (difflib)': dataset_program_fs_difflib_matches['award']['funding_source']['highest_ratio'],
-            'Acronym/Name Matching': 'yes' if dataset_program_name_matches else 'no',
-            'Acronym/Name Values': dataset_program_name_matches or None,
+            'Acronym/Name Matches?': 'yes' if dataset_program_name_matches else 'no',
+            'Acronym/Name Matching Values': dataset_program_name_matches or None,
             'Best acronym match to description (difflib)': dataset_program_acr_difflib_matches['acronym']['description']['acronym_str'],
             'Best description match to acronym (difflib)': dataset_program_acr_difflib_matches['acronym']['description']['description_str'],
             'Highest acronym-to-description similarity (difflib)': dataset_program_acr_difflib_matches['acronym']['description']['highest_ratio'],
@@ -149,9 +189,14 @@ for _, dataset_row in datasets_df.iterrows():
             'Best name match to title (difflib)': dataset_program_acr_difflib_matches['name']['title']['name_str'],
             'Best title match to name (difflib)': dataset_program_acr_difflib_matches['name']['title']['title_str'],
             'Highest name-to-title similarity (difflib)': dataset_program_acr_difflib_matches['name']['title']['highest_ratio'],
-            'PI Matching': 'yes' if dataset_program_pi_matches else 'no',
-            'PI Names': ';'.join(dataset_program_pi_matches) if dataset_program_pi_matches else None
-        })
+            'PI Matches?': 'yes' if dataset_program_pi_matches else 'no',
+            'PI Matching Values': ';'.join(dataset_program_pi_matches) if dataset_program_pi_matches else None
+        }
+
+        props_to_keep = get_columns(column_headers['programs_datasets'], args.rules, args.columns)
+
+        # Append result
+        program_results.append({prop: program_result[prop] for prop in props_to_keep if prop in program_result})
 
     continue
 
