@@ -39,6 +39,8 @@ programs_datasets:
       - Highest name-to-title similarity (difflib)
   rule3:
     core:
+      - Dataset PIs
+      - Program PIs
       - PI Matches?
       - PI Matching Values
     aux:

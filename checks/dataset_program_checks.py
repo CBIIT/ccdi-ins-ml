@@ -1,5 +1,6 @@
 import logging
 from difflib import SequenceMatcher
+from nameparser import HumanName
 from util.formatting import (
     clean_award_number
 )
@@ -222,12 +223,14 @@ def get_dataset_program_pi_matches(dataset_pi, program_pi_list):
         program_pi_list (list): The program's list of PIs
     """
 
-    matches = [pi for pi in dataset_pi if pi in program_pi_list]
+    dataset_name_tuples = [(name.first, name.last) for name in map(HumanName, dataset_pi)]
+    program_name_tuples = [(name.first, name.last) for name in map(HumanName, program_pi_list)]
+    common = set(dataset_name_tuples) & set(program_name_tuples)
 
-    if matches:
+    if common:
         logger.info(f"***************************************************************************************************************")
         logger.info(f"PI match found between dataset  and  program")
         logger.info(f"dataset_pi:                      '{dataset_pi}'")
         logger.info(f"program_pi_list:                 '{program_pi_list}'")
 
-    return matches
+    return ', '.join(f'{first} {last}' for first, last in common)

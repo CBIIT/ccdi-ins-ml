@@ -189,8 +189,10 @@ for _, dataset_row in datasets_df.iterrows():
             'Best name match to title (difflib)': dataset_program_acr_difflib_matches['name']['title']['name_str'],
             'Best title match to name (difflib)': dataset_program_acr_difflib_matches['name']['title']['title_str'],
             'Highest name-to-title similarity (difflib)': dataset_program_acr_difflib_matches['name']['title']['highest_ratio'],
+            'Dataset PIs': dataset_pi,
+            'Program PIs': program_pi_list,
             'PI Matches?': 'yes' if dataset_program_pi_matches else 'no',
-            'PI Matching Values': ';'.join(dataset_program_pi_matches) if dataset_program_pi_matches else None
+            'PI Matching Values': dataset_program_pi_matches if dataset_program_pi_matches else None
         }
 
         props_to_keep = get_columns(column_headers['programs_datasets'], args.rules, args.columns)

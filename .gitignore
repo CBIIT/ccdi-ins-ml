@@ -73,6 +73,7 @@ wheels/
 docs/_build/
 
 # IDEs and editors
+.devcontainer/
 .idea/
 .vscode/
 *.iml
