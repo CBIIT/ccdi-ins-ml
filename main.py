@@ -279,17 +279,6 @@ for _, dataset_row in datasets_df.iterrows():
             logger.info(f'dataset_funding_source:          `{dataset_funding_source}`')
             logger.info(f'grant_opportunity_number:        `{grant_opportunity_number}`')
 
-        # RULE 8: Org Matching
-        logger.info(f'RULE 8: Org Matching')
-        grant_org_related = False
-        if grant_org_name != '':
-            grant_org_related = grant_org_name in dataset_description
-        if grant_org_related:
-            logger.info(f'*******************************************************************************************************')
-            logger.info(f'Organization match found between dataset and grant')
-            logger.info(f'grant_org_name:                  `{grant_org_name}`')
-            logger.info(f'dataset_description:             `{dataset_description}`')
-
         # Append results
         grant_results.append({
             'datasets': dataset_title,
@@ -297,7 +286,6 @@ for _, dataset_row in datasets_df.iterrows():
             'project_id': project_id,
             'PI Matching': 'yes' if grant_pi_related else 'no',
             'Funding Matching': 'yes' if grant_funding_related else 'no',
-            'Org Matching': 'yes' if grant_org_related else 'no',
         })
 
 # Output results
