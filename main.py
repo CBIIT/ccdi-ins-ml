@@ -9,6 +9,9 @@ from sentence_transformers import (
     SentenceTransformer,
     util
 )
+from checks.dataset_grant_checks import (
+    get_dataset_grant_pi_matches
+)
 from checks.dataset_program_checks import (
     get_dataset_program_name_matches,
     get_dataset_program_funding_matches,
@@ -106,7 +109,7 @@ for _, dataset_row in datasets_df.iterrows():
     dataset_title = dataset_row.get('dataset_title').strip().lower()
     dataset_description = BeautifulSoup(dataset_row.get('description', '').lower(), 'html.parser').get_text()
     dataset_funding_source = dataset_row.get('funding_source')
-    dataset_pi = dataset_row.get('PI_name', '').strip().lower().split(';')
+    dataset_pi = dataset_row.get('PI_name').strip().lower().split(';') if dataset_row.get('PI_name') else None
 
     dataset_funding_source_list = [
         fs.strip().lower() for fs in str(dataset_funding_source).split(';') if fs.strip()
@@ -116,177 +119,184 @@ for _, dataset_row in datasets_df.iterrows():
     ]
 
     # Program Matching
-    for _, program_row in programs_df.iterrows():
-        # Extract and format program data
-        program_name = program_row.get('program_name')
-        program_id = program_row.get('program_id')
-        program_awards_list = list(filter(str.strip, [
-            award.strip().lower() for award in str(program_row.get('award', '')).split(';') if award.strip()
-        ]))
-        program_awards_list_cleaned = [
-            clean_award_number(x) for x in program_awards_list if clean_award_number(x)
-        ]
-        program_nofo_list = list(filter(str.strip, [
-            nofo.strip().lower() for nofo in str(program_row.get('nofo', '')).split(';') if nofo.strip()
-        ]))
-        program_nofo_list_cleaned = [
-            clean_award_number(x) for x in program_nofo_list if clean_award_number(x)
-        ]
-        program_acronym = program_row.get('program_acronym', '').strip().lower().replace('_', ' ')
-        program_pi_list = [
-            pi.strip().lower() for pi in str(program_row.get('contact_pi', '')).split(';') if pi.strip()
-        ]
+    if set(args.rules) & {1, 2, 3}:
+        for _, program_row in programs_df.iterrows():
+            # Extract and format program data
+            program_name = program_row.get('program_name')
+            program_id = program_row.get('program_id')
+            program_awards_list = list(filter(str.strip, [
+                award.strip().lower() for award in str(program_row.get('award', '')).split(';') if award.strip()
+            ]))
+            program_awards_list_cleaned = [
+                clean_award_number(x) for x in program_awards_list if clean_award_number(x)
+            ]
+            program_nofo_list = list(filter(str.strip, [
+                nofo.strip().lower() for nofo in str(program_row.get('nofo', '')).split(';') if nofo.strip()
+            ]))
+            program_nofo_list_cleaned = [
+                clean_award_number(x) for x in program_nofo_list if clean_award_number(x)
+            ]
+            program_acronym = program_row.get('program_acronym', '').strip().lower().replace('_', ' ')
+            program_pi_list = [
+                pi.strip().lower() for pi in str(program_row.get('contact_pi', '')).split(';') if pi.strip()
+            ]
 
-        # RULE 1: Funding Source Matching
-        logger.info(f'RULE 1: Funding Source Matching')
-        (dataset_program_funding_matches, dataset_program_fs_difflib_matches) = get_dataset_program_funding_matches(
-            dataset_description,
-            dataset_funding_source_list,
-            dataset_funding_source_list_cleaned,
-            program_awards_list,
-            program_awards_list_cleaned,
-            program_nofo_list,
-            program_nofo_list_cleaned)
+            # RULE 1: Funding Source Matching
+            logger.info(f'RULE 1: Funding Source Matching')
+            (dataset_program_funding_matches, dataset_program_fs_difflib_matches) = get_dataset_program_funding_matches(
+                dataset_description,
+                dataset_funding_source_list,
+                dataset_funding_source_list_cleaned,
+                program_awards_list,
+                program_awards_list_cleaned,
+                program_nofo_list,
+                program_nofo_list_cleaned)
 
-        # RULE 2: Name or Acronym Matching
-        logger.info(f'RULE 2: Name or Acronym Matching')
-        (dataset_program_name_matches, dataset_program_acr_difflib_matches) = get_dataset_program_name_matches(
-            dataset_description,
-            dataset_title,
-            program_acronym,
-            program_name)
+            # RULE 2: Name or Acronym Matching
+            logger.info(f'RULE 2: Name or Acronym Matching')
+            (dataset_program_name_matches, dataset_program_acr_difflib_matches) = get_dataset_program_name_matches(
+                dataset_description,
+                dataset_title,
+                program_acronym,
+                program_name)
 
-        # RULE 3: PI Matching
-        logger.info(f'RULE 3: PI Matching')
-        dataset_program_pi_matches = get_dataset_program_pi_matches(dataset_pi, program_pi_list)
+            # RULE 3: PI Matching
+            logger.info(f'RULE 3: PI Matching')
+            dataset_program_pi_matches = get_dataset_program_pi_matches(dataset_pi, program_pi_list)
 
-        program_result = {
-            'dataset_title': dataset_title,
-            'program_name': program_name,
-            'program_id': program_id,
-            'dataset_funding_sources': dataset_funding_source_list or None,
-            'dataset_funding_sources_cleaned': dataset_funding_source_list_cleaned or None,
-            'program_awards': program_awards_list or None,
-            'program_awards_cleaned': program_awards_list_cleaned or None,
-            'program_nofo': program_nofo_list or None,
-            'program_nofo_cleaned': program_nofo_list_cleaned or None,
-            'Funding Source Matches?': 'yes' if dataset_program_funding_matches else 'no',
-            'Funding Source Matching Values': dataset_program_funding_matches or None,
-            'Best funding_source match to award (difflib)': dataset_program_fs_difflib_matches['award']['funding_source']['dataset_str'],
-            'Best award match to funding_source (difflib)': dataset_program_fs_difflib_matches['award']['funding_source']['program_str'],
-            'Highest award-to-funding_source similarity (difflib)': dataset_program_fs_difflib_matches['award']['funding_source']['highest_ratio'],
-            'Acronym/Name Matches?': 'yes' if dataset_program_name_matches else 'no',
-            'Acronym/Name Matching Values': dataset_program_name_matches or None,
-            'Best acronym match to description (difflib)': dataset_program_acr_difflib_matches['acronym']['description']['acronym_str'],
-            'Best description match to acronym (difflib)': dataset_program_acr_difflib_matches['acronym']['description']['description_str'],
-            'Highest acronym-to-description similarity (difflib)': dataset_program_acr_difflib_matches['acronym']['description']['highest_ratio'],
-            'Best acronym match to title (difflib)': dataset_program_acr_difflib_matches['acronym']['title']['acronym_str'],
-            'Best title match to acronym (difflib)': dataset_program_acr_difflib_matches['acronym']['title']['title_str'],
-            'Highest acronym-to-title similarity (difflib)': dataset_program_acr_difflib_matches['acronym']['title']['highest_ratio'],
-            'Best name match to description (difflib)': dataset_program_acr_difflib_matches['name']['description']['name_str'],
-            'Best description match to name (difflib)': dataset_program_acr_difflib_matches['name']['description']['description_str'],
-            'Highest name-to-description similarity (difflib)': dataset_program_acr_difflib_matches['name']['description']['highest_ratio'],
-            'Best name match to title (difflib)': dataset_program_acr_difflib_matches['name']['title']['name_str'],
-            'Best title match to name (difflib)': dataset_program_acr_difflib_matches['name']['title']['title_str'],
-            'Highest name-to-title similarity (difflib)': dataset_program_acr_difflib_matches['name']['title']['highest_ratio'],
-            'Dataset PIs': dataset_pi,
-            'Program PIs': program_pi_list,
-            'PI Matches?': 'yes' if dataset_program_pi_matches else 'no',
-            'PI Matching Values': dataset_program_pi_matches if dataset_program_pi_matches else None
-        }
+            program_result = {
+                'dataset_title': dataset_title,
+                'program_name': program_name,
+                'program_id': program_id,
+                'dataset_funding_sources': dataset_funding_source_list or None,
+                'dataset_funding_sources_cleaned': dataset_funding_source_list_cleaned or None,
+                'program_awards': program_awards_list or None,
+                'program_awards_cleaned': program_awards_list_cleaned or None,
+                'program_nofo': program_nofo_list or None,
+                'program_nofo_cleaned': program_nofo_list_cleaned or None,
+                'Funding Source Matches?': 'yes' if dataset_program_funding_matches else 'no',
+                'Funding Source Matching Values': dataset_program_funding_matches or None,
+                'Best funding_source match to award (difflib)': dataset_program_fs_difflib_matches['award']['funding_source']['dataset_str'],
+                'Best award match to funding_source (difflib)': dataset_program_fs_difflib_matches['award']['funding_source']['program_str'],
+                'Highest award-to-funding_source similarity (difflib)': dataset_program_fs_difflib_matches['award']['funding_source']['highest_ratio'],
+                'Acronym/Name Matches?': 'yes' if dataset_program_name_matches else 'no',
+                'Acronym/Name Matching Values': dataset_program_name_matches or None,
+                'Best acronym match to description (difflib)': dataset_program_acr_difflib_matches['acronym']['description']['acronym_str'],
+                'Best description match to acronym (difflib)': dataset_program_acr_difflib_matches['acronym']['description']['description_str'],
+                'Highest acronym-to-description similarity (difflib)': dataset_program_acr_difflib_matches['acronym']['description']['highest_ratio'],
+                'Best acronym match to title (difflib)': dataset_program_acr_difflib_matches['acronym']['title']['acronym_str'],
+                'Best title match to acronym (difflib)': dataset_program_acr_difflib_matches['acronym']['title']['title_str'],
+                'Highest acronym-to-title similarity (difflib)': dataset_program_acr_difflib_matches['acronym']['title']['highest_ratio'],
+                'Best name match to description (difflib)': dataset_program_acr_difflib_matches['name']['description']['name_str'],
+                'Best description match to name (difflib)': dataset_program_acr_difflib_matches['name']['description']['description_str'],
+                'Highest name-to-description similarity (difflib)': dataset_program_acr_difflib_matches['name']['description']['highest_ratio'],
+                'Best name match to title (difflib)': dataset_program_acr_difflib_matches['name']['title']['name_str'],
+                'Best title match to name (difflib)': dataset_program_acr_difflib_matches['name']['title']['title_str'],
+                'Highest name-to-title similarity (difflib)': dataset_program_acr_difflib_matches['name']['title']['highest_ratio'],
+                'Dataset PIs': dataset_pi,
+                'Program PIs': program_pi_list,
+                'PI Matches?': 'yes' if dataset_program_pi_matches else 'no',
+                'PI Matching Values': dataset_program_pi_matches if dataset_program_pi_matches else None
+            }
 
-        props_to_keep = get_columns(column_headers['programs_datasets'], args.rules, args.columns)
+            props_to_keep = get_columns(column_headers['programs_datasets'], args.rules, args.columns)
 
-        # Append result
-        program_results.append({prop: program_result[prop] for prop in props_to_keep if prop in program_result})
-
-    continue
+            # Append result
+            program_results.append({prop: program_result[prop] for prop in props_to_keep if prop in program_result})
 
     # Project Matching
-    for _, project_row in project_df.iterrows():
-        # Extract and format project data
-        project_org_name = project_row.get('project_org_name', '')
-        project_title = project_row.get('project_title')
-        project_abstract_text = project_row.get('project_abstract_text', '')
-        project_id = project_row.get('project_id')
-        program_id = project_row.get('program.program_id')
+    if set(args.rules) & {4, 5}:
+        for _, project_row in project_df.iterrows():
+            # Extract and format project data
+            project_org_name = project_row.get('project_org_name', '')
+            project_title = project_row.get('project_title')
+            project_abstract_text = project_row.get('project_abstract_text', '')
+            project_id = project_row.get('project_id')
+            program_id = project_row.get('program.program_id')
 
-        # RULE 4: Org Matching
-        logger.info(f'RULE 4: Org Matching')
-        org_related = project_org_name.strip().lower() in dataset_description.strip().lower() if pd.notna(project_org_name) else False
-        if org_related:
-            logger.info(f'*******************************************************************************************************')
-            logger.info(f'Organization match found between dataset  and  project')
-            logger.info(f'dataset_title:                 `{dataset_title}`')
-            logger.info(f'project_title:                 `{project_title}`')
-
-
-        # RULE 5: Description Semantic Matching
-        logger.info(f'Description Semantic Matching ----- skip :{ not doSemantic }')
-        desc_related = False
-        if pd.notna(project_abstract_text) and doSemantic:
-            embedding1 = model.encode(project_abstract_text + project_title)
-            embedding2 = model.encode(dataset_description)
-            similarity = util.cos_sim(embedding1, embedding2).item()
-            desc_related = similarity > 0.6
-            if desc_related:
+            # RULE 4: Org Matching
+            logger.info(f'RULE 4: Org Matching')
+            org_related = project_org_name.strip().lower() in dataset_description.strip().lower() if pd.notna(project_org_name) else False
+            if org_related:
                 logger.info(f'*******************************************************************************************************')
-                logger.info(f'Description semantic match found  between dataset  and  project with similarity score {similarity:.2f}')
-                logger.info(f'dataset_description:             `{dataset_description}`')
-                logger.info(f'project_abstract_text:           `{project_abstract_text}`')
-        # Append results
-        project_results.append({
-            'datasets': dataset_title,
-            'program_id': program_id,
-            'project_id': project_id,
-            'Description Matching': 'yes' if desc_related else 'no',
-            'Org Matching': 'yes' if org_related else 'no',
-        })
+                logger.info(f'Organization match found between dataset  and  project')
+                logger.info(f'dataset_title:                 `{dataset_title}`')
+                logger.info(f'project_title:                 `{project_title}`')
+
+
+            # RULE 5: Description Semantic Matching
+            logger.info(f'Description Semantic Matching ----- skip :{ not doSemantic }')
+            desc_related = False
+            if pd.notna(project_abstract_text) and doSemantic:
+                embedding1 = model.encode(project_abstract_text + project_title)
+                embedding2 = model.encode(dataset_description)
+                similarity = util.cos_sim(embedding1, embedding2).item()
+                desc_related = similarity > 0.6
+                if desc_related:
+                    logger.info(f'*******************************************************************************************************')
+                    logger.info(f'Description semantic match found  between dataset  and  project with similarity score {similarity:.2f}')
+                    logger.info(f'dataset_description:             `{dataset_description}`')
+                    logger.info(f'project_abstract_text:           `{project_abstract_text}`')
+            # Append results
+            project_results.append({
+                'datasets': dataset_title,
+                'program_id': program_id,
+                'project_id': project_id,
+                'Description Matching': 'yes' if desc_related else 'no',
+                'Org Matching': 'yes' if org_related else 'no',
+            })
 
     # Grant Matching
-    for _, grant_row in grant_df.iterrows():
-        # Extract and format grant data
-        grant_id = grant_row.get('grant_id')
-        project_id = grant_row.get('project.project_id')
-        principal_investigators_list = [
-            pi.strip().lower() for pi in str(grant_row.get('principal_investigators', '')).split(';') if pi.strip()
-        ]
-        grant_opportunity_number = grant_row.get('grant_opportunity_number')
-        grant_org_name = grant_row.get('grant_org_name', '') 
-        grant_org_name= grant_org_name.strip().lower() if pd.notna(grant_org_name) else ''
-        
-        # RULE 6: PI Matching
-        logger.info(f'RULE 6: PI Matching')
-        grant_pi_related = False
-        if not (dataset_pi != '' or len(principal_investigators_list) == 0):
-            grant_pi_related = any(pi in dataset_pi for pi in principal_investigators_list)
-        if grant_pi_related:
-            logger.info(f'*******************************************************************************************************')
-            logger.info(f'PI match found between dataset and grant')
-            logger.info(f'dataset_pi:                      `{dataset_pi}`')
-            logger.info(f'principal_investigators_list:    `{principal_investigators_list}`')
+    if set(args.rules) & {'6', '7'}:
+        for _, grant_row in grant_df.iterrows():
+            # Extract and format grant data
+            grant_id = grant_row.get('grant_id')
+            project_id = grant_row.get('project.project_id')
+            principal_investigators_list = [
+                pi.strip().lower() for pi in str(grant_row.get('principal_investigators')).split(';') if pi.strip()
+            ] if grant_row.get('principal_investigators') else None
+            grant_opportunity_number = grant_row.get('grant_opportunity_number')
+            grant_org_name = grant_row.get('grant_org_name', '') 
+            grant_org_name= grant_org_name.strip().lower() if pd.notna(grant_org_name) else ''
 
-        # RULE 7: Funding Matching
-        logger.info(f'RULE 7: Funding Matching')
-        grant_funding_related = False
-        if grant_opportunity_number != '':
-            grant_funding_related = (
-                grant_opportunity_number in dataset_funding_source
-            ) if pd.notna(grant_opportunity_number) and pd.notna(dataset_funding_source) else False
-        if grant_funding_related:
-            logger.info(f'*******************************************************************************************************')
-            logger.info(f'Funding source match found between dataset and grant')
-            logger.info(f'dataset_funding_source:          `{dataset_funding_source}`')
-            logger.info(f'grant_opportunity_number:        `{grant_opportunity_number}`')
+            # Initialize results
+            dataset_grant_pi_matches = None
 
-        # Append results
-        grant_results.append({
-            'datasets': dataset_title,
-            'grant_id': grant_id,
-            'project_id': project_id,
-            'PI Matching': 'yes' if grant_pi_related else 'no',
-            'Funding Matching': 'yes' if grant_funding_related else 'no',
-        })
+            # RULE 6: PI Matching
+            if '6' in args.rules:
+                logger.info(f'RULE 6: PI Matching')
+                grant_pi_related = False
+                dataset_grant_pi_matches = get_dataset_grant_pi_matches(dataset_pi, principal_investigators_list)
+
+            # RULE 7: Funding Matching
+            if 7 in args.rules:
+                logger.info(f'RULE 7: Funding Matching')
+                grant_funding_related = False
+                if grant_opportunity_number != '':
+                    grant_funding_related = (
+                        grant_opportunity_number in dataset_funding_source
+                    ) if pd.notna(grant_opportunity_number) and pd.notna(dataset_funding_source) else False
+                if grant_funding_related:
+                    logger.info(f'*******************************************************************************************************')
+                    logger.info(f'Funding source match found between dataset and grant')
+                    logger.info(f'dataset_funding_source:          `{dataset_funding_source}`')
+                    logger.info(f'grant_opportunity_number:        `{grant_opportunity_number}`')
+
+            # Append results
+            grant_result = {
+                'dataset_title': dataset_title,
+                'grant_id': grant_id,
+                'project_id': project_id,
+                'Dataset PIs': dataset_pi,
+                'Grant PIs': principal_investigators_list,
+                'PI Matches?': 'yes' if dataset_grant_pi_matches else 'no',
+                'PI Matching Values': dataset_grant_pi_matches# if dataset_grant_pi_matches else None
+            }
+
+            props_to_keep = get_columns(column_headers['grants_datasets'], args.rules, args.columns)
+
+            # Append result
+            grant_results.append({prop: grant_result[prop] for prop in props_to_keep if prop in grant_result})
 
 # Output results
 now = datetime.datetime.now()
