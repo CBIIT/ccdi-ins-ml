@@ -1,0 +1,49 @@
+programs_datasets:
+  all:
+    core:
+      - dataset_title
+      - program_name
+      - program_id
+  rule1:
+    core:
+      - Funding Source Matches?
+      - Funding Source Matching Values
+    aux:
+      - dataset_funding_sources
+      - dataset_funding_source_cleaned
+      - program_awards
+      - program_award_cleaned
+      - program_nofo
+      - program_nofo_cleaned
+    difflib:
+      - Best funding_source match to award (difflib)
+      - Best award match to funding_source (difflib)
+      - Highest award-to-funding_source similarity (difflib)
+  rule2:
+    core:
+      - Acronym/Name Matches?
+      - Acronym/Name Matching Values
+    aux: null
+    difflib:
+      - Best acronym match to description (difflib)
+      - Best description match to acronym (difflib)
+      - Highest acronym-to-description similarity (difflib)
+      - Best acronym match to title (difflib)
+      - Best title match to acronym (difflib)
+      - Highest acronym-to-title similarity (difflib)
+      - Best name match to description (difflib)
+      - Best description match to name (difflib)
+      - Highest name-to-description similarity (difflib)
+      - Best name match to title (difflib)
+      - Best title match to name (difflib)
+      - Highest name-to-title similarity (difflib)
+  rule3:
+    core:
+      - Dataset PIs
+      - Program PIs
+      - PI Matches?
+      - PI Matching Values
+    aux:
+      - nameparser names
+      - nameparser matches
+    difflib: null
